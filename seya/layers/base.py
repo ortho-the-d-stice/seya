@@ -2,11 +2,146 @@ import numpy as np
 import theano
 import theano.tensor as T
 
-from keras.layers.core import MaskedLayer, Layer
+from keras.layers.core import Layer, Lambda
 from keras import backend as K
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 floatX = theano.config.floatX
+
+
+class MaskedLayer(Layer):
+    '''If your layer trivially supports masking
+    (by simply copying the input mask to the output),
+    then subclass MaskedLayer instead of Layer,
+    and make sure that you incorporate the input mask
+    into your calculation of get_output().
+    '''
+    def supports_masked_input(self):
+        return True
+
+    def get_input_mask(self, train=False):
+        if hasattr(self, 'previous'):
+            return self.previous.get_output_mask(train)
+        else:
+            return None
+
+    def get_output_mask(self, train=False):
+        ''' The default output mask is just the input mask unchanged.
+        Override this in your own implementations if,
+        for instance, you are reshaping the input'''
+        return self.get_input_mask(train)
+
+class LambdaMerge(Lambda):
+    '''LambdaMerge layer for evaluating an arbitrary Theano / TensorFlow
+    function over multiple inputs.
+
+    # Output shape
+        Specified by output_shape argument
+
+    # Arguments
+        layers - Input layers. Similar to layers argument of Merge
+        function - The function to be evaluated. Takes one argument:
+            list of outputs from input layers
+        output_shape - Expected output shape from function.
+            Could be a tuple or a function of list of input shapes
+        arguments: optional dictionary of keyword arguments to be passed
+            to the function.
+    '''
+    def __init__(self, layers, function, output_shape=None, arguments={}):
+        if len(layers) < 2:
+            raise Exception('Please specify two or more input layers '
+                            '(or containers) to merge.')
+        self.layers = layers
+        self.trainable_weights = []
+        self.regularizers = []
+        self.constraints = []
+        self.updates = []
+        self.arguments = arguments
+        for l in self.layers:
+            params, regs, consts, updates = l.get_params()
+            self.regularizers += regs
+            self.updates += updates
+            # params and constraints have the same size
+            for p, c in zip(params, consts):
+                if p not in self.trainable_weights:
+                    self.trainable_weights.append(p)
+                    self.constraints.append(c)
+        self.function = function
+        if output_shape is None:
+            self._output_shape = None
+        elif type(output_shape) in {tuple, list}:
+            self._output_shape = tuple(output_shape)
+        else:
+            assert hasattr(output_shape, '__call__'), 'In LambdaMerge, `output_shape` must be a list, a tuple, or a function.'
+            self._output_shape = output_shape
+        super(Lambda, self).__init__()
+
+    @property
+    def output_shape(self):
+        input_shapes = [layer.output_shape for layer in self.layers]
+        if self._output_shape is None:
+            return input_shapes[0]
+        elif type(self._output_shape) in {tuple, list}:
+            return (input_shapes[0][0],) + self._output_shape
+        else:
+            shape = self._output_shape(input_shapes)
+            if type(shape) not in {list, tuple}:
+                raise Exception('In LambdaMerge, the `output_shape` function must return a tuple.')
+            return tuple(shape)
+
+    def get_params(self):
+        return self.trainable_weights, self.regularizers, self.constraints, self.updates
+
+    def get_output(self, train=False):
+        inputs = [layer.get_output(train) for layer in self.layers]
+        arguments = self.arguments
+        arg_spec = inspect.getargspec(self.function)
+        if 'train' in arg_spec.args:
+            arguments['train'] = train
+        return self.function(inputs, **arguments)
+
+    def get_input(self, train=False):
+        res = []
+        for i in range(len(self.layers)):
+            o = self.layers[i].get_input(train)
+            if not type(o) == list:
+                o = [o]
+            for output in o:
+                if output not in res:
+                    res.append(output)
+        return res
+
+    @property
+    def input(self):
+        return self.get_input()
+
+    def supports_masked_input(self):
+        return False
+
+    def get_output_mask(self, train=None):
+        return None
+
+    def get_weights(self):
+        weights = []
+        for l in self.layers:
+            weights += l.get_weights()
+        return weights
+
+    def set_weights(self, weights):
+        for i in range(len(self.layers)):
+            nb_param = len(self.layers[i].trainable_weights) + len(self.non_trainable_weights)
+            self.layers[i].set_weights(weights[:nb_param])
+            weights = weights[nb_param:]
+
+    def get_config(self):
+        # note: not serializable at the moment.
+        config = {'name': self.__class__.__name__,
+                  'layers': [l.get_config() for l in self.layers],
+                  'function': self.function,
+                  'output_shape': self._output_shape,
+                  'arguments': self.arguments}
+        base_config = super(LambdaMerge, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
 
 class WinnerTakeAll2D(Layer):

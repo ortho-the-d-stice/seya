@@ -1,7 +1,7 @@
 import theano.tensor as T
 import keras.backend as K
-from keras.layers.core import LambdaMerge
-from keras import initializations
+from seya.layers.base import LambdaMerge
+from keras import initializers
 
 
 class MemN2N(LambdaMerge):
@@ -16,8 +16,8 @@ class MemN2N(LambdaMerge):
         self.hops = hops
         self.bow_mode = bow_mode
         self.mode = mode
-        self.init = initializations.get(init)
-        self.emb_init = initializations.get(emb_init)
+        self.init = initializers.get(init)
+        self.emb_init = initializers.get(emb_init)
         output_shape = (self.output_dim, )
 
         super(MemN2N, self).__init__(layers, lambda x: x, output_shape)

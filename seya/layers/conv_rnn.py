@@ -4,13 +4,13 @@ import theano.tensor as T
 
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.layers.recurrent import Recurrent
-from keras.layers.core import MaskedLayer
-from keras import initializations
+#from keras.layers.core import MaskedLayer
+from keras import initializers
 from keras import activations
 from keras import backend as K
 
 from seya.utils import apply_layer
-
+from seya.layers.base import MaskedLayer
 
 class ConvRNN(Recurrent):
     """RNN with all connections being convolutions:
@@ -43,8 +43,8 @@ class ConvRNN(Recurrent):
         self.border_mode = 'same'
         self.filter_dim = filter_dim
         self.reshape_dim = reshape_dim
-        self.init = initializations.get(init)
-        self.inner_init = initializations.get(inner_init)
+        self.init = initializers.get(init)
+        self.inner_init = initializers.get(inner_init)
         self.activation = activations.get(activation)
         self.inner_activation = activations.get(inner_activation)
         self.initial_weights = weights
