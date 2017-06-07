@@ -36,7 +36,7 @@ def theano_rng(seed=123):
 
 
 def apply_layer(layer, X, train=False):
-    tmp = layer.get_input
+    tmp = layer.input
     layer.get_input = lambda _: X
     Y = layer.get_output(train=train)
     layer.get_input = tmp
@@ -44,9 +44,9 @@ def apply_layer(layer, X, train=False):
 
 
 def apply_model(model, X):
-    tmp = model.layers[0].get_input
+    tmp = model.layers[0].input
     model.layers[0].get_input = lambda _: X
-    Y = model.get_output()
+    Y = model.output
     model.layers[0].get_input = tmp
 
     return Y
