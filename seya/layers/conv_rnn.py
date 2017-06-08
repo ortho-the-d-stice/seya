@@ -52,8 +52,11 @@ class ConvRNN(Recurrent):
         self.subsample = tuple(subsample)
         self.output_dim = (filter_dim[0], reshape_dim[1]//self.subsample[0],
                            reshape_dim[2]//self.subsample[1])
+        self.units = reshape_dim[2] // self.subsample[1]
+        self.states = [K.zeros((filter_dim[0], self.units))]
 
         super(ConvRNN, self).__init__(**kwargs)
+
 
     def _get_batch_size(self, X):
         if K._BACKEND == 'theano':
@@ -62,18 +65,18 @@ class ConvRNN(Recurrent):
             batch_size = self.batch_size
         return batch_size
 
-    def build(self):
+    def build(self, input_shape):
         if K._BACKEND == 'theano':
             batch_size = None
         else:
             batch_size = None  # self.batch_size
-        input_dim = self.input_shape
+        input_dim = input_shape
         bm = self.border_mode
         reshape_dim = self.reshape_dim
         hidden_dim = self.output_dim
 
         nb_filter, nb_rows, nb_cols = self.filter_dim
-        self.input = K.placeholder(shape=(batch_size, input_dim[1], input_dim[2]))
+        self.inbound_nodes = K.placeholder(shape=(batch_size, input_dim[1], input_dim[2]))
 
         # self.b_h = K.zeros((nb_filter,))
         self.conv_h = Convolution2D(nb_filter, nb_rows, nb_cols, border_mode=bm, input_shape=hidden_dim)
@@ -155,15 +158,15 @@ class ConvGRU(ConvRNN):
             init=init, inner_init=inner_init, activation=activation,
             inner_activation=inner_activation, weights=weights, **kwargs)
 
-    def build(self):
+    def build(self, input_shape):
         batch_size = None
-        input_dim = self.input_shape
+        input_dim = input_shape
         bm = self.border_mode
         reshape_dim = self.reshape_dim
         hidden_dim = self.output_dim
 
         nb_filter, nb_rows, nb_cols = self.filter_dim
-        self.input = K.placeholder(shape=(batch_size, input_dim[1], input_dim[2]))
+        self.inbound_nodes = K.placeholder(shape=(batch_size, input_dim[1], input_dim[2]))
 
         self.b_h = K.zeros((nb_filter,))
         self.b_r = K.zeros((nb_filter,))
@@ -178,13 +181,13 @@ class ConvGRU(ConvRNN):
         self.conv_x_r = Convolution2D(nb_filter, nb_rows, nb_cols, border_mode=bm, input_shape=reshape_dim)
 
         # hidden to hidden connections
-        self.conv_h.build()
-        self.conv_z.build()
-        self.conv_r.build()
+        self.conv_h.build(input_shape)
+        self.conv_z.build(input_shape)
+        self.conv_r.build(input_shape)
         # input to hidden connections
-        self.conv_x_h.build()
-        self.conv_x_z.build()
-        self.conv_x_r.build()
+        self.conv_x_h.build(input_shape)
+        self.conv_x_z.build(input_shape)
+        self.conv_x_r.build(input_shape)
 
         self.max_pool = MaxPooling2D(pool_size=self.subsample)
 
@@ -265,12 +268,11 @@ class TimeDistributedModel(MaskedLayer):
             batch_size = self.batch_size
         return batch_size
 
-    def build(self):
+    def build(self, input_shape):
         # if K._BACKEND == 'theano':
         #     batch_size = None
         # else:
         #     batch_size = self.batch_size
-        input_shape = self.input_shape
         self.input = K.placeholder(shape=(None, input_shape[1],
                                           input_shape[2]))
         self.model.build()

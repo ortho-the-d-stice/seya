@@ -42,7 +42,8 @@ class TestConvRNNs(unittest.TestCase):
                         # input_shape=(timesteps, input_flat),
                         return_sequences=True)
         model = Sequential()
-        model.add(TimeDistributed(Dense(input_flat, input_dim=input_flat)))
+        model.add(TimeDistributed( Dense(input_flat, input_shape=(input_flat,)),
+                                   input_shape=(1,input_flat) ))
         model.add(layer)
         model.compile('sgd', 'mse')
 
