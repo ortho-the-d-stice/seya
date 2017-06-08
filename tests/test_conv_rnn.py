@@ -7,7 +7,8 @@ import unittest
 import numpy as np
 
 from keras.models import Sequential
-from keras.layers.core import TimeDistributedDense
+from keras.layers.core import Dense
+from keras.layers.wrappers import TimeDistributed
 from keras.layers.convolutional import Convolution2D
 from seya.layers.conv_rnn import ConvRNN, ConvGRU, TimeDistributedModel
 
@@ -25,7 +26,7 @@ class TestConvRNNs(unittest.TestCase):
                         return_sequences=True)
         model = Sequential()
         model.add(layer)
-        model.add(TimeDistributedDense(10))
+        model.add(TimeDistributed(Dense(10)))
         model.compile('sgd', 'mse')
 
         x = np.random.randn(nb_samples, timesteps, input_flat)
@@ -41,7 +42,8 @@ class TestConvRNNs(unittest.TestCase):
                         # input_shape=(timesteps, input_flat),
                         return_sequences=True)
         model = Sequential()
-        model.add(TimeDistributedDense(input_flat, input_dim=input_flat))
+        model.add(TimeDistributed( Dense(input_flat, input_shape=(input_flat,)),
+                                   input_shape=(1,input_flat) ))
         model.add(layer)
         model.compile('sgd', 'mse')
 
@@ -62,7 +64,7 @@ class TestConvRNNs(unittest.TestCase):
             inner, batch_size=nb_samples, input_shape=(timesteps, input_flat))
         model = Sequential()
         model.add(layer)
-        model.add(TimeDistributedDense(10))
+        model.add(TimeDistributed(Dense(10)))
         model.compile('sgd', 'mse')
 
         x = np.random.randn(nb_samples, timesteps, input_flat)

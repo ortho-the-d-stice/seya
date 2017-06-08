@@ -1,6 +1,6 @@
 from keras import backend as K
 from keras.layers.core import Layer
-from keras import initializations, activations
+from keras import initializers, activations
 
 from seya.regularizers import GaussianKL
 
@@ -32,7 +32,7 @@ class VariationalDense(Layer):
         self.prior_logsigma = prior_logsigma
         self.regularizer_scale = regularizer_scale
         self.batch_size = batch_size
-        self.init = initializations.get(init)
+        self.init = initializers.get(init)
         self.activation = activations.get(activation)
         self.output_dim = output_dim
         self.initial_weights = weights
